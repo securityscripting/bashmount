@@ -43,12 +43,14 @@ issue at L<https://github.com/securityscripting/bashmount-au/issues>.
 
 =head1 AUTHORS
 
-bashmount:
+bashmount
+
 Jamie Nguyen E<lt>j@jamielinux.comE<gt>
 
 Lukas B.
 
-bashmount-au:
+bashmount-au
+
 Damian M.
 
 =head1 COPYRIGHT
