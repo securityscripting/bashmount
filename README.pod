@@ -1,20 +1,30 @@
 =head1 NAME
 
-bashmount - tool to mount and unmount removable media
+bashmount-au - tool to mount and unmount removable media from the command-line with added optional logging and two person authentication. 
+NIST 800-53a RMF compliance (DAAPM, JSIG, etc)
 
 =head1 SYNOPSIS
 
-I<bashmount>
+I<bashmount-au>
 
 =head1 DESCRIPTION
 
-bashmount is a menu-driven bash script that can use different
-backends to easily mount, unmount or eject removable devices
-without dependencies on udisks or any GUI. An extensive
-configuration file allows many aspects of the script to be
-modified and custom commands to be run on devices.
-bashmount can also be used alongside any automounting solutions,
-such as graphical file managers, udev rules or Udiskie.
+bashmount-au provides the same functionality and interface
+as the original bashmount as a menu-driven bash script that 
+can use different backends to easily mount, unmount or eject 
+removable devices without dependencies on udisks or any GUI. 
+An extensive configuration file allows many aspects of the
+script to be modified (although pre-configured for this version)
+and custom commands to be run on devices. bashmount-au was
+designed to help comply with NIST 800-53a and various government
+Risk Management Framework technical requirements for external media 
+controls and auditing. bashmount-au is NOT intended to be used 
+alongside any automounting solutions due to the logging requirements. 
+The original bashmount program was re-named because the specific 
+goal of bashmount-au is to meet compliance requirements and 
+is therefore not designed to be as flexible as the original
+intended. See INSTALL for config and pre-config requirements.
+
 
 =head1 FILES
 
@@ -29,18 +39,23 @@ Default configuration file
 =head1 BUGS
 
 If you find any bugs, please send an email to the author, or create a new
-issue at L<https://github.com/jamielinux/bashmount/issues>.
+issue at L<https://github.com/securityscripting/bashmount-au/issues>.
 
 =head1 AUTHORS
 
+bashmount:
 Jamie Nguyen E<lt>j@jamielinux.comE<gt>
 
 Lukas B.
+
+bashmount-au:
+Damian M.
 
 =head1 COPYRIGHT
 
    Copyright (C) 2013-2014 Jamie Nguyen <j@jamielinux.com>
    Copyright (C) 2014 Lukas B.
+   Copyright (C) 2014 Damian M.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License v2 as published by the

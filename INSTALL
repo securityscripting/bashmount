@@ -5,34 +5,59 @@ Dependencies
  * eject
  * Optional: udisks2
 
-bashmount should work on all distributions with a recent version of lsblk.
+ * inotify-tools (optional auditing)
+ * ntfs-3g (if using ntfs drives)
+
+bashmount-au should work on all supported distributions with lsblk. Tested on RHEL6 & RHEL7.
 
 
 Installation
 ============
 
-1. As root, copy "bashmount" to "/usr/bin" or any other location in $PATH:
+1. As root, copy "bashmount-au" to "/usr/bin" or any other location in $PATH:
 
-        install -m755 bashmount /usr/bin/bashmount
+        install -m700 bashmount-au /usr/bin/bashmount-au
 
 2. Backup any existing configuration files.
 
-3. As root, copy "bashmount.conf" to "/etc/bashmount.conf" for global
+3. As root, copy "bashmount-au.conf" to "/etc/bashmount-au.conf" for global
    configuration:
 
-        install -m644 bashmount.conf /etc/bashmount.conf
+        install -m600 bashmount-au.conf /etc/bashmount-au.conf
 
-4. Optionally, copy "bashmount.conf" to "$HOME/.config/bashmount/config"
+4. As root, copy "mediawatch.sh" to /usr/bin/mediawatch.sh
+
+	install -m600 mediawatch.sh /usr/bin/mediawatch.sh
+
+5. Optionally, copy "bashmount-au.conf" to "$HOME/.config/bashmount-au/config"
    for per-user configuration:
 
-        mkdir -p $HOME/.config/bashmount/
-        install -m644 bashmount.conf $HOME/.config/bashmount/config
+        mkdir -p $HOME/.config/bashmount-au/
+        install -m600 bashmount-au.conf $HOME/.config/bashmount-au/config
 
-5. Optionally, copy "bashmount.1" to "/usr/share/man/man1":
+6. Optionally, copy "bashmount-au.1" to "/usr/share/man/man1":
 
-        gzip -9 bashmount.1
-        install -m644 bashmount.1.gz /usr/share/man/man1/bashmount.1.gz
+        gzip -9 bashmount-au.1
+        install -m644 bashmount-au.1.gz /usr/share/man/man1/bashmount-au.1.gz
 
-6. Make life a bit easier by setting an alias in "$HOME/.bashrc":
+7. Make life a bit easier by setting an alias in "$HOME/.bashrc":
 
-        alias bm='bashmount'
+        alias mount='bashmount-au'
+
+
+Configuration
+=============
+
+1. Disable autofs and gnome-automount & auto_run according to your distributions directions.
+
+2. Create a group for data transfer personnel and assign designated personnel (ie. dta)
+
+3. Configure /etc/sudoers file and assign group to run bashmount-au. (ie. %dta ALL=(ALL) /usr/bin/bashmount-au)
+
+4. Configure /etc/bashmount-au.conf for desired checks and logfile (must create this file). Default is all strict checks. See config file for explanation and variable settings including optional second authentication.
+
+5. Verify or change existing mount command to restrict to root. Remove all mounting of external devices in /etc/fstab.
+
+6. Install inotify-tools from EPEL repository.
+
+7. You should also set audit.rules and/or aide.conf watches on bashmount-au, bashmount-au.conf, and mediawatch.sh files.

@@ -1,3 +1,11 @@
+bashmount-au 1.0.0 (2017-06-09) 
+  - Damian M.
+  - Using original bashmount as a base for different type of project
+  - Added pre_init and post_init options
+  - Modified to work with rhel6
+  - Capture removable vfat filesystems consistently
+  - Modified .conf file to include various security related pre-checks and force mountpoint and auditing  
+
 bashmount 3.2.0 (2014-04-19)
   - Shorten long device names and add padding so that device labels all
     align vertically, making things easier to read
