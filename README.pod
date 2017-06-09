@@ -1,7 +1,7 @@
 =head1 NAME
 
 bashmount-au - tool to mount and unmount removable media from the command-line with added optional logging and two person authentication. 
-NIST 800-53a RMF compliance (DAAPM, JSIG, etc)
+NIST 800-53A RMF compliance (DAAPM, JSIG, etc)
 
 =head1 SYNOPSIS
 
