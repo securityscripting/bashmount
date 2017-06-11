@@ -1,5 +1,15 @@
+bashmount-au 1.1.0 (2017-06-10) 
+  Damian M.
+  - Removed open option. Limited sudo executable would allow user to drop to full root shell.
+  - Multiple file name references changed. Typos's fixed.
+  - Added Virus scan media option
+  - Added mounted display to show mountpath
+  - Modified read-only option
+  - Added options for additional logging
+  - Modified various logging verbage and logical errors. 
+
 bashmount-au 1.0.0 (2017-06-09) 
-  - Damian M.
+  Damian M.
   - Using original bashmount as a base for different type of project
   - Added pre_init and post_init options
   - Modified to work with rhel6

@@ -1,22 +1,33 @@
 #!/bin/bash
 
-#=============================================================================#
-#        FILE: bashmount                                                      #
-#     VERSION: 3.2.0                                                          #
-# DESCRIPTION: bashmount is a menu-driven bash script that can use different  #
-#              backends to easily mount, unmount or eject removable devices   #
-#              without dependencies on udisks or any GUI. An extensive        #
-#              configuration file allows many aspects of the script to be     #
-#              modified and custom commands to be run on devices.             #
-#     LICENSE: GPLv2                                                          #
-#     AUTHORS: Jamie Nguyen <j@jamielinux.com>                                #
-#              Lukas B.                                                       #
-#	       Damian M.                                                      #
-#=============================================================================#
+#=======================================================================================#
+#        FILE: bashmount-au                                                   		#
+#     VERSION: 1.1.0                                                          		#
+# DESCRIPTION:										# 
+#		bashmount-au provides the same functionality and interface		#
+#		as the original bashmount as a menu-driven bash script that 		#
+#		can use different backends to easily mount, unmount or eject		# 
+#		removable devices without dependencies on udisks or any GUI.		# 
+#		An extensive configuration file allows many aspects of the		#
+#		script to be modified (although pre-configured for this version)	#
+#		and custom commands to be run on devices. bashmount-au was		#
+#		designed to help comply with NIST 800-53a and various government 	#
+#		Risk Management Framework technical requirements for external media	# 
+#		controls and auditing. bashmount-au is NOT intended to be used 		#
+#		alongside any automounting solutions due to the logging requirements.	# 
+#		The original bashmount program was re-named because the specific 	#
+#		goal of bashmount-au is to meet compliance requirements and 		#
+#		is therefore not designed to be as flexible as the original		#
+#		intended. See INSTALL for config and pre-config requirements.		#
+#											#
+#     AUTHORS: Jamie Nguyen <j@jamielinux.com>                                		#
+#              Lukas B.                                                       		#
+#	       Damian M.                                                      		#
+#=======================================================================================#
 
 # Copyright (C) 2013-2014 Jamie Nguyen <j@jamielinux.com>
 # Copyright (C) 2014 Lukas B.
-# Copyright (C) 2014 Damian M.
+# Copyright (C) 2017 Damian M.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License v2 as published by the
@@ -36,7 +47,7 @@ declare -r VERSION='3.2.0'
 if (( $# > 0 )); then
     if [[ "${1}" = '-V' || "${1}" = '--version' ]]; then
         cat << EOF
-bashmount ${VERSION}
+bashmount-au ${VERSION}
 Copyright (C) 2013-2014 Jamie Nguyen <j@jamielinux.com>
 Copyright (C) 2014 Lukas B.
 Copyright (C) 2017 Damian M.
@@ -45,11 +56,11 @@ This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
 Written by Jamie Nguyen and Lukas B. 
-Modifications to comply with NIST 800-53 external media control and auditing by Damian M.
+Modifications to comply with NIST 800-53A external media control and auditing by Damian M.
 EOF
         exit 0
     else
-        printf '%s\n' 'bashmount: invalid option.'
+        printf '%s\n' 'bashmount-au: invalid option.'
         exit 64
     fi
 fi
@@ -107,12 +118,12 @@ filemanager() {
 }
 
 post_mount() {
-    error "No command specified in 'bashmount.conf'."
+    error "No command specified in 'bashmount-au.conf'."
     return 1
 }
 
 post_unmount() {
-    error "No command specified in 'bashmount.conf'."
+    error "No command specified in 'bashmount-au.conf'."
     return 1
 }
 
@@ -120,18 +131,18 @@ post_unmount() {
 declare CONFIGFILE=
 
 if [[ -z "${XDG_CONFIG_HOME}" ]]; then
-    CONFIGFILE="${HOME}/.config/bashmount/config"
+    CONFIGFILE="${HOME}/.config/bashmount-au/config"
 else
-    CONFIGFILE="${XDG_CONFIG_HOME}/bashmount/config"
+    CONFIGFILE="${XDG_CONFIG_HOME}/bashmount-au/config"
 fi
 
 if [[ ! -f "${CONFIGFILE}" ]]; then
-    CONFIGFILE='/etc/bashmount.conf'
+    CONFIGFILE='/etc/bashmount-au.conf'
 fi
 
 if [[ -f "${CONFIGFILE}" ]]; then
     if ! . "${CONFIGFILE}"; then
-        printf '%s\n' 'bashmount: Failed to source configuration file.'
+        printf '%s\n' 'bashmount-au: Failed to source configuration file.'
         exit 78
     fi
 fi
@@ -140,13 +151,13 @@ if [[ "${udisks}" == "auto" ]]; then
     type -p udisksctl >/dev/null 2>&1 && udisks=1 || udisks=0
 elif  (( udisks == 1 )); then
     if ! type -p udisksctl >/dev/null 2>&1; then
-        printf '%s\n' "bashmount: 'udisksctl': command not found"
+        printf '%s\n' "bashmount-au: 'udisksctl': command not found"
         exit 69
     fi
 fi
 
 if ! type -p lsblk >/dev/null 2>&1; then
-    printf '%s\n' "bashmount: 'lsblk': command not found"
+    printf '%s\n' "bashmount-au: 'lsblk': command not found"
     exit 69
 fi
 
@@ -186,10 +197,10 @@ error() {
 print_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
-    printf '%s' "   ${BLUE}m${ALL_OFF}: mount   ${BLUE}o${ALL_OFF}: open"
-    printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount"
-    printf '%s' "${BLUE}a${ALL_OFF}: unmount all"
-    printf '%s' "   ${BLUE}r${ALL_OFF}: refresh"
+    printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount  ${BLUE}u${ALL_OFF}: unmount" 
+    #${BLUE}o${ALL_OFF}: open"
+    printf '%s' "${BLUE}a${ALL_OFF}: unmount all"   
+    printf '%s' "  ${BLUE}r${ALL_OFF}: refresh"
     printf '%s\n\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
 }
 
@@ -197,11 +208,11 @@ print_submenu_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
     if info_mounted "${devname}"; then
-        printf '%s' "   ${BLUE}u${ALL_OFF}: unmount"
+        printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount"
     else
-        printf '%s' "   ${BLUE}m${ALL_OFF}: mount"
+        printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount"
     fi
-    printf '%s\n\n' "   ${BLUE}o${ALL_OFF}: open"
+    #printf '%s\n\n' "   ${BLUE}o${ALL_OFF}: open"
     printf '%s' "${BLUE}b${ALL_OFF}: back   ${BLUE}r${ALL_OFF}: refresh"
     printf '%s\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
 
@@ -275,11 +286,11 @@ print_help() {
     printf '%s' "${BOLD}To mount the first device, enter ${ALL_OFF}"
     printf '%s' "${BLUE}1m${ALL_OFF}"
     printf '%s\n\n' "${BOLD}.${ALL_OFF}"
-    printf '%s' "${GREEN}==>${ALL_OFF} "
-    printf '%s\n\n' "${BOLD}To open the mountpath directory of the first${ALL_OFF}"
-    printf '%s' "${BOLD}    device (mounting if required), enter "
-    printf '%s' "${BLUE}1o${ALL_OFF}"
-    printf '%s\n\n' "${BOLD}.${ALL_OFF}"
+    #printf '%s' "${GREEN}==>${ALL_OFF} "
+    #printf '%s\n\n' "${BOLD}To open the mountpath directory of the first${ALL_OFF}"
+    #printf '%s' "${BOLD}    device (mounting if required), enter "
+    #printf '%s' "${BLUE}1o${ALL_OFF}"
+    #printf '%s\n\n' "${BOLD}.${ALL_OFF}"
     printf '%s' "${GREEN}==>${ALL_OFF} "
     printf '%s' "${BOLD}To view a device sub-menu, "
     printf '%s\n\n' "just enter the number.${ALL_OFF}"
@@ -351,7 +362,7 @@ print_device_name() {
 
     printf '%s' " ${info_label}"
     if info_mounted "${devname}"; then
-        printf '%s' " ${GREEN}[mounted]${ALL_OFF}"
+        printf '%s' " ${GREEN}[$(info_mountpath ${devname})]${ALL_OFF}"
         mounted[${#mounted[*]}]="${devname}"
     fi
     printf '\n'
@@ -476,26 +487,27 @@ action_mount() {
     enter_to_continue
 }
 
-action_open() {
-    if ! info_mounted "${1}"; then
-        printf '\n'
-        msg "Mounting ${1} ..."
-        if mount_command "${1}"; then
-            msg "${1} mounted succesfullly."
-            (( run_post_mount )) && post_mount "${1}"
-        else
-            printf '\n'
-            error "${1} could not be mounted."
-            enter_to_continue
-            return 1
-        fi
-    fi
-    printf '\n'
-    msg "Opening ${1} ..."
-    printf '\n'
-    filemanager "$(info_mountpath "${1}")"
-    enter_to_continue
-}
+#commenting out. If program is only run with sudo privilege, this would drop to a full privileged use shell
+#action_open() {
+#    if ! info_mounted "${1}"; then
+#        printf '\n'
+#        msg "Mounting ${1} ..."
+#        if mount_command "${1}"; then
+#            msg "${1} mounted succesfullly."
+#            (( run_post_mount )) && post_mount "${1}"
+#        else
+#            printf '\n'
+#            error "${1} could not be mounted."
+#            enter_to_continue
+#            return 1
+#        fi
+#    fi
+#    printf '\n'
+#    msg "Opening ${1} ..."
+#    printf '\n'
+#    filemanager "$(info_mountpath "${1}")"
+#   enter_to_continue
+#}
 
 action_unmount() {
     printf '\n'
@@ -636,7 +648,6 @@ submenu() {
         'e') action_eject "${devname}";;
         'i') action_info "${devname}";;
         'm') action_mount "${devname}";;
-        'o') action_open "${devname}";;
         'u') action_unmount "${devname}";;
         'b') return 1;;
         'r') return 0;;
@@ -658,9 +669,11 @@ submenu() {
             msg 'Mounting read-only ...'
             printf '\n'
             mount_options="${default_mount_options}"' --read-only'
-            mount_command "${devname}"
-            mount_options="${default_mount_options}"
-            enter_to_continue
+            #should go to action_mount first, or post_mount will be skipped
+            #mount_command "${devname}"
+            action_mount "${devname}"
+            #mount_options="${default_mount_options}"
+            #enter_to_continue
             return 0;;
         '2')
             printf '\n'
@@ -687,7 +700,7 @@ submenu() {
         '4')
             if (( custom4_show )); then
                 printf '\n'
-                msg "Running custom command ${custom4_desc} ..."
+                msg "Running ${custom4_desc} ..."
                 printf '\n'
                 custom4_command "${devname}"
                 enter_to_continue
@@ -698,7 +711,7 @@ submenu() {
         '5')
             if (( custom5_show )); then
                 printf '\n'
-                msg "Running custom command ${custom5_desc} ..."
+                msg "Running ${custom5_desc} ..."
                 printf '\n'
                 custom5_command "${devname}"
                 enter_to_continue
@@ -709,7 +722,7 @@ submenu() {
         '6')
             if (( custom6_show )); then
                 printf '\n'
-                msg "Running custom command ${custom6_desc} ..."
+                msg "Running ${custom6_desc} ..."
                 printf '\n'
                 custom6_command "${devname}"
                 enter_to_continue
@@ -738,7 +751,7 @@ select_action() {
             while :; do
                 submenu || break
             done
-        elif [[ "${action}" =~ ^[1-9][0-9]*[eimou]$ ]]; then
+        elif [[ "${action}" =~ ^[1-9][0-9]*[eimu]$ ]]; then
             number="$(( ${action%?} - 1 ))"
             letter="${action: -1}"
             if (( number >= device_number )); then
@@ -750,7 +763,6 @@ select_action() {
                 'e') action_eject "${devname}";;
                 'i') action_info "${devname}";;
                 'm') action_mount "${devname}";;
-                'o') action_open "${devname}";;
                 'u') action_unmount "${devname}";;
                  *)  return 1;;
             esac

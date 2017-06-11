@@ -16,7 +16,7 @@ removable devices without dependencies on udisks or any GUI.
 An extensive configuration file allows many aspects of the
 script to be modified (although pre-configured for this version)
 and custom commands to be run on devices. bashmount-au was
-designed to help comply with NIST 800-53a and various government
+designed to help comply with NIST 800-53A and various government
 Risk Management Framework technical requirements for external media 
 controls and auditing. bashmount-au is NOT intended to be used 
 alongside any automounting solutions due to the logging requirements. 
@@ -43,14 +43,12 @@ issue at L<https://github.com/securityscripting/bashmount-au/issues>.
 
 =head1 AUTHORS
 
-bashmount
-
+bashmount:
 Jamie Nguyen E<lt>j@jamielinux.comE<gt>
 
 Lukas B.
 
-bashmount-au
-
+bashmount-au:
 Damian M.
 
 =head1 COPYRIGHT
