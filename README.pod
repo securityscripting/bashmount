@@ -49,7 +49,7 @@ issue at L<https://github.com/securityscripting/bashmount-au/issues>.
 
 =head1 AUTHORS
 
-Damian M. <audit2html@gmail.com> forked from bashmount
+Damian M. <secscripts@gmail.com> forked from bashmount
 
 =head1 COPYRIGHT
 
