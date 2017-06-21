@@ -29,13 +29,17 @@ Installation
 
 	install -m600 mediawatch.sh /usr/bin/mediawatch.sh
 
-5. Optionally, copy "bashmount-au.conf" to "$HOME/.config/bashmount-au/config"
+5 As root, copy "bashmount-au.functions" to /usr/share/bashmount-au.functions
+
+	install -m600 bashmount-au.functions /usr/share/bashmount-au.functions
+
+6. Optionally, copy "bashmount-au.conf" to "$HOME/.config/bashmount-au/config"
    for per-user configuration:
 
         mkdir -p $HOME/.config/bashmount-au/
         install -m600 bashmount-au.conf $HOME/.config/bashmount-au/config
 
-6. Optionally, copy "bashmount-au.1" to "/usr/share/man/man1":
+7. Optionally, copy "bashmount-au.1" to "/usr/share/man/man1":
 
         gzip -9 bashmount-au.1
         install -m644 bashmount-au.1.gz /usr/share/man/man1/bashmount-au.1.gz

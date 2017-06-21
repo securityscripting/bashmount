@@ -1,24 +1,35 @@
 #!/bin/bash
+#local -a watchdir_selectable=
 
-watchdir1="${1}"
-watchdir2="${2}"
-logfile="${3}"
+watchdir_const1="${1}"
+watchdir_const2="${2}"
+watchdir_selectable="${3}"
+logfile="${4}"
 
-inotifywait -m -r "${watchdir1}" "${watchdir2}" | while read path action file; do 
+rpm -qa | grep inotify-tools >> /dev/null
+if [[ $? != 0 ]];then
+  echo "inotify executable cannot be found. Install inotify-tools..exiting"
+  exit 1
+fi 
+
+inotifywait -m -r "${watchdir_const1}" "${watchdir_const2}" $watchdir_selectable | while read path action file; do 
 
 #sets timestamp
 date_fmt="$(date +%D-%H-%M-%S)"
 
 send_to_log () {
-
-      echo "${date_fmt}":"${1}""${2}":"${3}" >> "${logfile}"
+1="${path}"
+2="${file}"
+3="${action}"
+     
+  echo "${date_fmt}":"${path}""${file}":"${action}" >> "${logfile}"
 }
 
     case $action in
          MOVED_FROM)
-          action="moved from "${path}"; send_to_log "${path}" "${file}" "${action}";;
+          action="moved from ${path}"; send_to_log "${path}" "${file}" "${action}";;
 	 MOVED_TO)
-	  action="moved to "${path}"; send_to_log "${path}" "${file}" "${action}";;
+	  action="moved to ${path}"; send_to_log "${path}" "${file}" "${action}";;
          UNMOUNT)
 	  action="directory unmounted"; send_to_log "${path}" "${file}" "${action}";;
          ACCESS)

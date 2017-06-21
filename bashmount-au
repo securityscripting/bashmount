@@ -2,28 +2,36 @@
 
 #=======================================================================================#
 #        FILE: bashmount-au                                                   		#
-#     VERSION: 1.1.0                                                          		#
-# DESCRIPTION:										# 
-#		bashmount-au provides the same functionality and interface		#
-#		as the original bashmount as a menu-driven bash script that 		#
-#		can use different backends to easily mount, unmount or eject		# 
-#		removable devices without dependencies on udisks or any GUI.		# 
-#		An extensive configuration file allows many aspects of the		#
-#		script to be modified (although pre-configured for this version)	#
-#		and custom commands to be run on devices. bashmount-au was		#
-#		designed to help comply with NIST 800-53a and various government 	#
-#		Risk Management Framework technical requirements for external media	# 
-#		controls and auditing. bashmount-au is NOT intended to be used 		#
-#		alongside any automounting solutions due to the logging requirements.	# 
-#		The original bashmount program was re-named because the specific 	#
-#		goal of bashmount-au is to meet compliance requirements and 		#
-#		is therefore not designed to be as flexible as the original		#
-#		intended. See INSTALL for config and pre-config requirements.		#
-#											#
-#     AUTHORS: Jamie Nguyen <j@jamielinux.com>                                		#
-#              Lukas B.                                                       		#
-#	       Damian M.                                                      		#
-#=======================================================================================#
+#     VERSION: 1.3                                                         		#
+# DESCRIPTION:	                                                                        #
+#      										        #
+# bashmount-au provides the same functionality and interface				#		  
+# as the original bashmount as a menu-driven bash script to mount 	                #
+# removable devices with the added capability of logging all file                       #
+# access and transfers to removable devices with optional two person                    #
+# authentication. 							                #
+#                                                                                       #
+# bashmount-au was modified to help comply with NIST 800-53A and various                #
+# government Risk Management Framework technical requirements for external              # 
+# media controls and logging.                                                           #
+#                                                                                       #
+# bashmount-au is NOT intended to be used alongside any automounting                    #
+# solutions due to the specific logging requirement and is therefore more               #   
+# restricted than the original intended.					        #
+#										        #	  
+# The goal of bashmount-au is to help system administrators and                         #
+# security engineers meet technical compliance requirements                             #
+# while giving non-technical data transfer personnel an easy to                         #
+# use interface. 								        #  
+#              	          							        #
+# See INSTALL for config and pre-config requirements to secure                          #
+# external media access and logging in order to fully meet compliance	                #
+#  AUTHORS: bashmount:								        #
+#	       Jamie Nguyen <j@jamielinux.com>                                	        #	
+#              Lukas B.  							        #
+#	       bashmount-au:                                                            #
+#	       Damian M.    		                                                #
+#=======================================================================================# 
 
 # Copyright (C) 2013-2014 Jamie Nguyen <j@jamielinux.com>
 # Copyright (C) 2014 Lukas B.
@@ -42,7 +50,7 @@
 # this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-declare -r VERSION='3.2.0'
+declare -r VERSION='2.1'
 
 if (( $# > 0 )); then
     if [[ "${1}" = '-V' || "${1}" = '--version' ]]; then
@@ -55,8 +63,8 @@ License GPLv2: GNU GPL version 2 <http://www.gnu.org/licenses/gpl-2.0.html>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
-Written by Jamie Nguyen and Lukas B. 
-Modifications to comply with NIST 800-53A external media control and auditing by Damian M.
+Original bashmount display functions and front end-interface by Jamie Nguyen and Lukas B. 
+Back-end functions for NIST 800-53A external media control and auditing by Damian M.
 EOF
         exit 0
     else
@@ -118,17 +126,28 @@ filemanager() {
 }
 
 post_mount() {
-    error "No command specified in 'bashmount-au.conf'."
+    error "No command specified in 'bashmount-au.functions'."
     return 1
 }
 
 post_unmount() {
-    error "No command specified in 'bashmount-au.conf'."
+    error "No command specified in 'bashmount-au.functions'."
+    return 1
+}
+
+pre_init() {
+    error "No command specified in 'bashmount-au.functions'."
+    return 1
+}
+
+post_init() {
+    error "No command specified in 'bashmount-au.functions'."
     return 1
 }
 
 # Load configuration file.
 declare CONFIGFILE=
+declare FUNCTIONSFILE=
 
 if [[ -z "${XDG_CONFIG_HOME}" ]]; then
     CONFIGFILE="${HOME}/.config/bashmount-au/config"
@@ -140,9 +159,21 @@ if [[ ! -f "${CONFIGFILE}" ]]; then
     CONFIGFILE='/etc/bashmount-au.conf'
 fi
 
+if [[ ! -f "${FUNCTIONSFILE}" ]]; then
+    FUNCTIONSFILE='/usr/share/bashmount-au.functions'
+fi
+
 if [[ -f "${CONFIGFILE}" ]]; then
     if ! . "${CONFIGFILE}"; then
         printf '%s\n' 'bashmount-au: Failed to source configuration file.'
+        exit 78
+    fi
+fi
+
+
+if [[ -f "${FUNCTIONSFILE}" ]]; then
+    if ! . "${FUNCTIONSFILE}"; then
+        printf '%s\n' 'bashmount-au: Failed to source functions file.'
         exit 78
     fi
 fi
@@ -197,8 +228,8 @@ error() {
 print_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
-    printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount  ${BLUE}u${ALL_OFF}: unmount" 
-    #${BLUE}o${ALL_OFF}: open"
+    printf '%s' "   ${BLUE}m${ALL_OFF}: mount  ${BLUE}u${ALL_OFF}: unmount" 
+    printf '%s\n\n' "  ${BLUE}x${ALL_OFF}: burn"
     printf '%s' "${BLUE}a${ALL_OFF}: unmount all"   
     printf '%s' "  ${BLUE}r${ALL_OFF}: refresh"
     printf '%s\n\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
@@ -208,11 +239,11 @@ print_submenu_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
     if info_mounted "${devname}"; then
-        printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount"
+        printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount   ${BLUE}x${ALL_OFF}: burn"
     else
-        printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount"
+        printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount   ${BLUE}x${ALL_OFF}: burn"
     fi
-    #printf '%s\n\n' "   ${BLUE}o${ALL_OFF}: open"
+    #printf '%s\n\n' 
     printf '%s' "${BLUE}b${ALL_OFF}: back   ${BLUE}r${ALL_OFF}: refresh"
     printf '%s\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
 
@@ -286,11 +317,10 @@ print_help() {
     printf '%s' "${BOLD}To mount the first device, enter ${ALL_OFF}"
     printf '%s' "${BLUE}1m${ALL_OFF}"
     printf '%s\n\n' "${BOLD}.${ALL_OFF}"
-    #printf '%s' "${GREEN}==>${ALL_OFF} "
-    #printf '%s\n\n' "${BOLD}To open the mountpath directory of the first${ALL_OFF}"
-    #printf '%s' "${BOLD}    device (mounting if required), enter "
-    #printf '%s' "${BLUE}1o${ALL_OFF}"
-    #printf '%s\n\n' "${BOLD}.${ALL_OFF}"
+    printf '%s' "${GREEN}==>${ALL_OFF} "
+    printf '%s\n\n' "${BOLD}To burn a disk, enter ${ALL_OFF}"
+    printf '%s' "${BLUE}x${ALL_OFF}"
+    printf '%s\n\n' "${BOLD}.${ALL_OFF}"
     printf '%s' "${GREEN}==>${ALL_OFF} "
     printf '%s' "${BOLD}To view a device sub-menu, "
     printf '%s\n\n' "just enter the number.${ALL_OFF}"
@@ -332,7 +362,7 @@ print_device_name() {
     info_label="$(info_fslabel "${devname}")"
     if [[ -z "${info_label}" ]]; then
         if [[ "${1}" == 'optical' ]]; then
-            info_label="$(lsblk -dno MODEL "${devname}")"
+            info_label="$(lsblk -dno MODEL "${devname}" 2>/dev/null)"
         else
             info_label="$(info_partlabel "${devname}")"
         fi
@@ -377,22 +407,29 @@ print_device_name() {
 # Returns 0 if the device is registered as removable device in the kernel,
 # otherwise it returns 1.
 info_removable() {
-    if [[ "$(lsblk -drno RM "${1}")" == '1' ]]; then
-          return 0
+removable_device="no"
+    if [[ "$(lsblk -drno RM "${1}" 2>/dev/null)" == '1' ]]; then
+          removable_device=yes
     else 
-    	is_removable="$(udisks --show-info "${1}"| grep "system internal" | awk -F: '{ print $2 }')"
-        if [ $? != 0 ];then #errored out so try another way
-           #no double quotes to remove whitespace
-           if [ $is_removable = 0 ]; then #check anyway
-         		return 0
-           else #try a third way
-		readlink -f /sys/class/block/"${1}"/dev | grep usb
-                if [ $? !=0 ]; then
-                     return 1
+          device="$(lsblk -dlno NAME ${1})"
+	  readlink -f /sys/class/block/"${device}"/dev | grep usb >/dev/null
+          if [[ $? == "0" ]]; then
+             removable_device=yes
+          else
+             if [[ -x udisks ]]; then
+    	        is_removable="$(udisks --show-info "${1}"| grep "system internal" | awk -F: '{ print $2 }')"
+                if [ $is_removable = 0 ]; then
+                   removable_device=yes
                 fi
-          fi
-      	fi
+             fi 
+	 fi  
      fi
+
+if [ "${removable_device}" != "yes" ]; then
+     return 1
+else
+     return 0
+fi
 }
 
 # Prints the device type, for example partition or disk.
@@ -402,37 +439,42 @@ info_type() {
 
 # Prints the filesystem label, if present.
 info_fslabel() {
-    lsblk -drno LABEL "${1}"
+    lsblk -drno LABEL "${1}" 2>/dev/null
 }
 
 # Prints the partition label, if present.
 info_partlabel() {
   if [ $util_linux_ver != "2.17.2" ]; then
-    lsblk -drno PARTLABEL "${1}" 
+    lsblk -drno PARTLABEL "${1}" 2>/dev/null 
   else
-    lsblk -drno LABEL "${1}"
+    lsblk -drno LABEL "${1}" 2>/dev/null
   fi
 }
 
 # Prints the mountpath, if mounted.
 info_mountpath() {
-    findmnt -no TARGET "${1}"
+    findmnt -no TARGET "${1}" 2>/dev/null
 }
 
 # Returns 0 if the device is mounted, 1 otherwise.
 info_mounted() {
-    findmnt -no TARGET "${1}" >/dev/null 2>&1
+    findmnt -no TARGET "${1}" >/dev/null #2>&1
 }
 
 # Prints the filesystem type.
 info_fstype() {
-    lsblk -drno FSTYPE "${1}"
+    lsblk -drno FSTYPE "${1}" 2>/dev/null
 }
 
 # Prints the device size.
 info_size() {
-    lsblk -drno SIZE "${1}"
+    lsblk -drno SIZE "${1}" 2>/dev/null
 }
+
+info_uuid() {
+    lsblk -drno UUID "${1}" 2>/dev/null
+}
+
 # }}}
 
 #-------------------------------------#
@@ -476,6 +518,7 @@ action_mount() {
         error "${1} is already mounted."
     else
         msg "Mounting ${1} ..."
+        (( run_pre_mount )) && pre_mount "${1}"
         if mount_command "${1}"; then
             msg "${1} mounted succesfullly."
             (( run_post_mount )) && post_mount "${1}"
@@ -536,7 +579,8 @@ list_devices() {
     local -a all=() removable=() internal=() optical=()
     # The array "all" contains the sorted list of devices returned by lsblk. 
     # CHANGED: not using -p option. Doesn't exist in all versions of lsblk. Just adding dev directory below.
-    all=( $(lsblk -lno NAME) )
+    # using KNAME instead of NAME
+    all=( $(lsblk -lno KNAME) )
     # The array "listed" contains all devices that are shown to the user.
     listed=()
     # The array "mounted" contains all devices that are listed and mounted.
@@ -552,11 +596,10 @@ list_devices() {
         for string in ${blacklist[@]}; do
             #PARTLABEL column not available on rhel6 version
             #output 2>/dev/null or lsblk shows complains
-            if [ $util_linux_ver != "2.17.2" ]; then
-            lsblk -dPno NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT,PARTLABEL "${devname}" \
-                | grep -E "${string}" >/dev/null 2>&1
+            if [[ $util_linux_ver != "2.17.2" ]]; then
+            lsblk -dPno NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT,PARTLABEL "${devname}" | grep -E "${string}" >/dev/null 2>/dev/null #2>&1
             else
-               lsblk -dPno NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT "${devname}" 2>/dev/null | grep -E "${string}" > /dev/null # 2>&1 Comment out error notifications
+               lsblk -dPno NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT "${devname}" | grep -E "${string}" >/dev/null 2>/dev/null # 2>&1 Comment out error notifications
 	    fi
             (( $? )) || continue 2
         done
@@ -614,7 +657,7 @@ list_devices() {
 
 submenu() {
     check_device "${devname}" || return 1
-    local info_label= info_fstype= info_size=
+    local info_label= info_fstype= info_size= into_uuid=
     info_label="$(info_fslabel "${devname}")"
     if [[ -z "${info_label}" ]]; then
         info_label="$(info_partlabel "${devname}")"
@@ -624,6 +667,7 @@ submenu() {
     fi
     info_fstype="$(info_fstype "${devname}")"
     info_size="$(info_size "${devname}")"
+    info_uuid="$(info_uuid "${devname}")"
     clear
     print_separator_device
     printf '%s\n' "device    : ${devname}"
@@ -637,6 +681,8 @@ submenu() {
     fi
     printf '%s\n' "fstype    : ${info_fstype}"
     printf '%s\n' "size      : ${info_size}"
+    printf '%s\n' "uuid	  : ${info_uuid}"
+
     if (( show_commands )); then
         printf '\n'
         print_submenu_commands
@@ -649,6 +695,7 @@ submenu() {
         'i') action_info "${devname}";;
         'm') action_mount "${devname}";;
         'u') action_unmount "${devname}";;
+        'x') action_burn "${devname}";;
         'b') return 1;;
         'r') return 0;;
         'q') #modification to keep script from exiting if post_init function fails. CTL-C required to kill
@@ -792,6 +839,7 @@ select_action() {
                 return 1;;
             'r'|"")
                 return 0;;
+            'x') action_burn "${devname}";;
             'q'|'b') #modification to keep script from exiting if post_init function fails. CTL-C required to kill
 		    if [ $run_post_init ]; then  
                		 if ! post_init; then

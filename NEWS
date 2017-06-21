@@ -1,4 +1,15 @@
-bashmount-au 1.1.0 (2017-06-10) 
+bashmount-au 1.3 (2017-06-19)
+  Damian M.
+  - Moved optional functions to .functions file
+  - Added configuration options to .conf file
+
+bashmount-au 1.2 (2017-06-15)
+  Damian M.
+  - Added option to launch k3b as user and not with sudo privilege and log files burned.
+  - Moved all checks to pre-init section so all warnings are seen upon launch
+  - Updated readme
+
+bashmount-au 1.1 (2017-06-10) 
   Damian M.
   - Removed open option. Limited sudo executable would allow user to drop to full root shell.
   - Multiple file name references changed. Typos's fixed.
@@ -8,7 +19,7 @@ bashmount-au 1.1.0 (2017-06-10)
   - Added options for additional logging
   - Modified various logging verbage and logical errors. 
 
-bashmount-au 1.0.0 (2017-06-09) 
+bashmount-au 1.0 (2017-06-09) 
   Damian M.
   - Using original bashmount as a base for different type of project
   - Added pre_init and post_init options
