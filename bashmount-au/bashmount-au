@@ -2,7 +2,7 @@
 
 #=======================================================================================#
 # FILE: bashmount-au                                                   		        #
-# VERSION: 1.4                                                         		        #
+# VERSION: 1.5                                                         		        #
 # DESCRIPTION:	                                                                        #
 #      										        #
 # bashmount-au provides the same functionality and interface				#		  
@@ -82,7 +82,7 @@ unset GREP_OPTIONS
 
 # Set defaults.
 declare udisks='auto'
-declare default_mount_options='--options nosuid,noexec,noatime'
+declare default_mount_options='--options nosuid,noexec,noatime,uid=${SUDO_UID}'
 declare -i show_internal=1
 declare -i show_removable=1
 declare -i show_optical=1
@@ -99,18 +99,7 @@ declare -a blacklist=()
 # Util_linux version check. Not all options are available.
 util_linux_ver="$(lsblk -V | awk -F ' ' '{ print $4 }' )"
 
-mount_command() {
-    if (( udisks == 0 )); then
-        read -r -e -p 'Choose the mountpoint directory: ' dir
-        while [[ ! -d "${dir}" ]] || findmnt "${dir}" >/dev/null 2>&1; do
-            error 'No such directory, or mountpoint is already in use.'
-            read -r -e -p 'Choose the mountpoint directory: ' dir
-        done
-        mount ${mount_options} "${1}" "${dir}"
-    else
-        udisksctl mount ${mount_options} --block-device "${1}"
-    fi
-}
+
 
 unmount_command() {
     if (( udisks == 0 )); then
@@ -160,7 +149,7 @@ if [[ ! -f "${CONFIGFILE}" ]]; then
 fi
 
 if [[ ! -f "${FUNCTIONSFILE}" ]]; then
-    FUNCTIONSFILE='/usr/share/bashmount-au.functions'
+    FUNCTIONSFILE='/usr/share/bashmount-au/bashmount-au.functions'
 fi
 
 if [[ -f "${CONFIGFILE}" ]]; then
@@ -229,28 +218,34 @@ print_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
     printf '%s' "   ${BLUE}m${ALL_OFF}: mount  ${BLUE}u${ALL_OFF}: unmount" 
-    printf '%s\n\n' "  ${BLUE}x${ALL_OFF}: burn"
-    printf '%s' "${BLUE}a${ALL_OFF}: unmount all"   
+    printf '%s\n\n' "  ${BLUE}x${ALL_OFF}: burn" 
+    printf '%s' "${BLUE}o${ALL_OFF}: open" 
+    printf '%s' "  ${BLUE}a${ALL_OFF}: unmount all"   
     printf '%s' "  ${BLUE}r${ALL_OFF}: refresh"
     printf '%s\n\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
+   
 }
 
 print_submenu_commands() {
     print_separator_commands
     printf '%s' "${BLUE}e${ALL_OFF}: eject   ${BLUE}i${ALL_OFF}: info"
     if info_mounted "${devname}"; then
-        printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount   ${BLUE}x${ALL_OFF}: burn"
+        printf '%s\n\n' "   ${BLUE}u${ALL_OFF}: unmount   ${BLUE}x${ALL_OFF}: burn  ${BLUE}o${ALL_OFF}: open"
     else
-        printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount   ${BLUE}x${ALL_OFF}: burn"
+        printf '%s\n\n' "   ${BLUE}m${ALL_OFF}: mount   ${BLUE}x${ALL_OFF}: burn  ${BLUE}o${ALL_OFF}: open"
     fi
-    #printf '%s\n\n' 
     printf '%s' "${BLUE}b${ALL_OFF}: back   ${BLUE}r${ALL_OFF}: refresh"
-    printf '%s\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
-
-    printf '\n'
+    printf '%s\n\n' "   ${BLUE}q${ALL_OFF}: quit   ${BLUE}?${ALL_OFF}: help"
+    
     printf '%s' "${BLUE}1${ALL_OFF}: read-only"
     printf '%s' "   ${BLUE}2${ALL_OFF}: luksOpen"
     printf '%s' "   ${BLUE}3${ALL_OFF}: luksClose"
+      info_type=$(info_type "${devname}")
+    if [[ "${info_type}" == 'rom' ]]; then
+        if info_mounted "${devname}"; then
+            printf '%s' "   ${BLUE}t${ALL_OFF}: AFT"
+        fi
+    fi
     printf '\n'
 
     if (( custom4_show )) || (( custom5_show )) || (( custom6_show )); then
@@ -391,8 +386,8 @@ print_device_name() {
     done
 
     printf '%s' " ${info_label}"
-    if info_mounted "${devname}"; then
-        printf '%s' " ${GREEN}[$(info_mountpath ${devname})]${ALL_OFF}"
+    if info_ismounted "${devname}"; then
+        printf '%s' " ${GREEN}[$(info_mountpoint ${devname})]${ALL_OFF}"
         mounted[${#mounted[*]}]="${devname}"
     fi
     printf '\n'
@@ -456,9 +451,19 @@ info_mountpath() {
     findmnt -no TARGET "${1}" 2>/dev/null
 }
 
+# Prints the mountpath a different way, if mounted.
+info_mountpoint() {
+    lsblk -drno MOUNTPOINT "${1}" 2>/dev/null
+}
+
 # Returns 0 if the device is mounted, 1 otherwise.
 info_mounted() {
     findmnt -no TARGET "${1}" >/dev/null #2>&1
+}
+
+info_ismounted() {
+    lsblk -drno MOUNTPOINT "${1}" >/dev/null
+
 }
 
 # Prints the filesystem type.
@@ -530,27 +535,26 @@ action_mount() {
     enter_to_continue
 }
 
-#commenting out. If program is only run with sudo privilege, this would drop to a full privileged use shell
-#action_open() {
-#    if ! info_mounted "${1}"; then
-#        printf '\n'
-#        msg "Mounting ${1} ..."
-#        if mount_command "${1}"; then
-#            msg "${1} mounted succesfullly."
-#            (( run_post_mount )) && post_mount "${1}"
-#        else
-#            printf '\n'
-#            error "${1} could not be mounted."
-#            enter_to_continue
-#            return 1
-#        fi
-#    fi
-#    printf '\n'
-#    msg "Opening ${1} ..."
-#    printf '\n'
-#    filemanager "$(info_mountpath "${1}")"
-#   enter_to_continue
-#}
+action_open() {
+    if ! info_mounted "${1}"; then
+        printf '\n'
+        msg "Mounting ${1} ..."
+        if mount_command "${1}"; then
+            msg "${1} mounted succesfullly."
+            (( run_post_mount )) && post_mount "${1}"
+        else
+            printf '\n'
+            error "${1} could not be mounted."
+            enter_to_continue
+            return 1
+        fi
+    fi
+    printf '\n'
+    msg "Opening $(info_mountpath "${1}") ..."
+    printf '\n'
+    filemanager "$(info_mountpath "${1}")"
+    enter_to_continue
+}
 
 action_unmount() {
     printf '\n'
@@ -579,7 +583,7 @@ list_devices() {
     local -a all=() removable=() internal=() optical=()
     # The array "all" contains the sorted list of devices returned by lsblk. 
     # CHANGED: not using -p option. Doesn't exist in all versions of lsblk. Just adding dev directory below.
-    # using KNAME instead of NAME
+    # using KNAME instead of NAME to filter out luks 
     all=( $(lsblk -lno KNAME) )
     # The array "listed" contains all devices that are shown to the user.
     listed=()
@@ -675,7 +679,7 @@ submenu() {
     printf '%s' 'mounted   : '
     if info_mounted "${devname}"; then
         printf '%s\n' "${GREEN}yes${ALL_OFF}"
-        printf '%s\n' "mountpath : $(info_mountpath "${devname}")"
+        printf '%s\n' "mountpath : $(info_mountpoint "${devname}")"
     else
         printf '%s\n' "${RED}no${ALL_OFF}"
     fi
@@ -695,9 +699,18 @@ submenu() {
         'i') action_info "${devname}";;
         'm') action_mount "${devname}";;
         'u') action_unmount "${devname}";;
+        'o') action_open "${devname}";;
         'x') action_burn "${devname}";;
+        
         'b') return 1;;
         'r') return 0;;
+        't') 
+            if info_mounted "${devname}"; then
+                action_aft "${devname}"
+            else
+                error "you must first mount the device"
+            fi
+	    ;;
         'q') #modification to keep script from exiting if post_init function fails. CTL-C required to kill
 	     if [ $run_post_init ]; then  
                 if ! post_init; then
@@ -798,7 +811,7 @@ select_action() {
             while :; do
                 submenu || break
             done
-        elif [[ "${action}" =~ ^[1-9][0-9]*[eimu]$ ]]; then
+        elif [[ "${action}" =~ ^[1-9][0-9]*[eimou]$ ]]; then
             number="$(( ${action%?} - 1 ))"
             letter="${action: -1}"
             if (( number >= device_number )); then
@@ -810,6 +823,7 @@ select_action() {
                 'e') action_eject "${devname}";;
                 'i') action_info "${devname}";;
                 'm') action_mount "${devname}";;
+                'o') action_open "${devname}";;
                 'u') action_unmount "${devname}";;
                  *)  return 1;;
             esac

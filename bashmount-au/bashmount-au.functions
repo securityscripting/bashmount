@@ -1,4 +1,4 @@
-#. /etc/bashmount-au.conf
+
 
 # Set filemanager command to use when performing the "open" command. The mount
 # point is passed as the first argument. The default is to open the directory
@@ -6,7 +6,7 @@
 
 # Uncomment this example to launch a graphical file manager.
 filemanager() {
-   /usr/bin/nautilus "$1" & >/dev/null 2>&1
+   runuser -l $user -c '/usr/bin/nautilus /mnt &' >/dev/null 2>&1
 }
 
 # Uncomment this example to launch midnight commander in a new window.
@@ -14,16 +14,38 @@ filemanager() {
 #   /usr/bin/uxterm -wf -e /usr/bin/mc "$1" & >/dev/null 2>&1
 #}
 
+
+user_mount() {
+    if (( udisks == 0 )); then
+        read -r -e -p 'Choose the mountpoint directory: ' dir
+        while [[ ! -d "${dir}" ]] || findmnt "${dir}" >/dev/null 2>&1; do
+            error 'No such directory, or mountpoint is already in use.'
+            read -r -e -p 'Choose the mountpoint directory: ' dir
+        done
+        mount_options="${default_mount_options},umask=$umask"
+        mount ${mount_options} "${1}" "${dir}"
+    else
+        mount_options="${default_mount_options},umask=$umask"
+        udisksctl mount ${mount_options} --block-device "${1}"
+    fi
+}
+
 # Function to perform a second unique authentication.
 second_auth () {
+ if [[ "${auth_mode}" == "local" ]]; then 
+   if [[ "${gui}" == "yes" ]]; then
+     witness_info=$(yad --form  --title="Witness" --field=username --field=password:H)
+	witness=$(echo $witness_info | cut -d '|' -f 1)
+	pw=$(echo $witness_info | cut -d '|' -f 2)
+ else
    read -r -e -p "Enter witness username: " witness 
-   
+ fi
    grep -E -w "${witness}" /etc/shadow >> /dev/null
    if [[ "$?" != "0" ]];then
       error "Invalid username"
       pass=false
       
-   elif [[ "${SUDO_USER}" == "${witness}" ]]; then
+   elif [[ "${user}" == "${witness}" ]]; then
      error "The witness must be a different user"
      pass=false
    
@@ -51,7 +73,19 @@ second_auth () {
         	fi
       done
    fi
-  
+
+ elif [[ "${auth_mode}" == "remote" ]]; then
+    if remote_auth; then
+       pass=true
+    else
+       pass=false
+    fi
+   
+ else
+    error "Set auth_mode in configuration file to 'local' or 'remote'"
+    pass = false
+ fi
+ sleep 2
       if [[ "${pass}" != true ]]; then
         return 1
       fi
@@ -98,45 +132,65 @@ ask_questions() {
  fi 
 }
 
-mount_failed () {
-  if [[ "${enable_logging}" == 'yes' ]]; then
-    echo "${date_fmt}:${SUDO_USER}:mount failed" >> "${logfile}"
-  fi
-    return 1
-}
 
 # Customize the command used for mounting. You should not need to change this.
 # Open /usr/bin/bashmount in a text editor to see the default commands.
 # The device path /dev/sdx is passed as first argument.
 #
 # This example creates mountpoint directories and sets permissions so only the user running the script has access.
+run_mount () {
+
+mountpoint="$(findmnt -no TARGET "${1}")"
+
+if [[ "${enable_logging}" == 'yes' ]]; then
+   
+   if [[ "${log_mountpoint_only}" != "yes" ]]; then
+      if [[ "${find_writeable_directories}" == "yes" ]]; then  
+      
+             #takes awhile. Run right before mounting  
+             msg "All writeable directories will be audited...this can take a few minutes to start" 
+          writeable_directories="$(find / -type d \( -user $user -perm /222 -o -perm /002 \) -not \( -path /home/$user -prune \) -not \( -path /mnt/$user -prune \) -not \( -path $watch_directories -prune \))"
+      fi
+   fi
+fi
+       if [[ "${choose_mountpoint}" != "yes" ]]; then
+          if [ ! -d /mnt/"${user}" ]; then
+             mkdir /mnt/"${user}"
+          fi
+             #don't let anyone other than the user have access
+             chmod 700 /mnt/"${user}"
+             chown $user /mnt/"${user}"
+  
+          if [ ! -d "/mnt/"${user}"/${1##*/}" ]; then
+             mkdir /mnt/"${user}"/${1##*/}
+          fi 
+             dir=/mnt/"${user}"/${1##*/}
+             echo 
+             mount_options="${default_mount_options},umask=$umask"
+             mount ${mount_options} "${1}" "${dir}"
+      else
+         user_mount "${1}"
+      fi
+}
+
+mount_failed () {
+  if [[ "${enable_logging}" == 'yes' ]]; then
+    echo "${date_fmt}:${user}:mount failed" >> "${logfile}"
+  fi
+    return 1
+}
+
 mount_command() {
 ask_questions
- #if [[ "${run_pre_mount}" ]]; then
-   #if ! pre_mount "${dir}"; then
-      #mount_failed
-   #else
      if [[ "${tpi}" == 'yes' ]]; then
        if ! second_auth; then
           mount_failed
        else
-          #don't let anyone other than the user have access
-          if [ ! -d /mnt/"${SUDO_USER}" ]; then
-             mkdir /mnt/"${SUDO_USER}"
-          fi
-             chmod 700 /mnt/"${SUDO_USER}"
-             chown $SUDO_USER /mnt/"${SUDO_USER}"
-  
-          if [ ! -d "/mnt/"${SUDO_USER}"/${1##*/}" ]; then
-             mkdir /mnt/"${SUDO_USER}"/${1##*/}
-          fi 
-             dir=/mnt/"${SUDO_USER}"/${1##*/}
-             echo
-             mount ${mount_options} "${1}" "${dir}"
+          run_mount "${1}"
        fi
+     else
+        run_mount "${1}"
      fi
-   #fi
- #fi  
 }
 
 #virus_scan () {
@@ -144,15 +198,11 @@ ask_questions
 #    "${antivirus_scanner_exec}" "${1}"
 #}
 
+# Set custom unmount_command. Comment out if not used.
 #unmount_command() {
-#   umount "$1"
+#   umount "${1}"
 #}
 
-# Set custom commands. Set "customX_show" to '0' to disable or '1' to enable.
-# If enabled, the custom commands will be shown in the device sub-menu. The
-# description and command functions can be set to anything you desire. The
-# device name (e.g. /dev/sdb1) is passed as the first and only argument.
-# A maximum of 3 custom actions are configurable.
 
 action_burn() {
 ask_questions
@@ -160,25 +210,32 @@ if [[ "${tpi}" == 'yes' ]]; then
   if second_auth; then
      if [[ "${enable_logging}" == 'yes' ]]; then
         date_k3b_fmt="$(date +%F-%H-%M-%S)"
-        k3b_file="/var/log/k3b-burn/${date_k3b_fmt}-k3b.log"
-        echo "${date_fmt}:$SUDO_USER:starting k3b" >> "${logfile}" 
+        k3b_file="/tmp/k3b-burn/${date_k3b_fmt}-k3b.log"
+        echo "${date_fmt}:$user:starting k3b" >> "${logfile}" 
         #echo "================ "${date_k3b_fmt}" ====================" >> "${k3b_file}"
         #info_label="$(info_fslabel "${1}")"
         #echo "label: ${info_label}" >> "${k3b_file}"
         #run a watch where k3b temporarily stores a file of items selected to be burned. Copies the file to another location before k3b removes it.
-        nohup /usr/bin/logk3b.sh "${SUDO_USER}" "${k3b_file}" </dev/null >/dev/null 2>&1 &
-        runuser -l $SUDO_USER -c 'k3b >/dev/null 2>/dev/null'
+        nohup /usr/bin/logk3b.sh "${user}" "${k3b_file}" </dev/null >/dev/null 2>&1 &
+         logk3b_pid="$(ps -ef | grep logk3b.*"${k3b_file}" | awk -F ' ' '{ print $2 }')"
+          logk3b_inotify_pid="$(ps -ef | grep inotify.*"${k3b_file}" | awk -F ' ' '{ print $2 }')"
+        runuser -l $user -c 'k3b >/dev/null 2>/dev/null' 
      else
-        runuser -l $SUDO_USER -c 'k3b >/dev/null 2>/dev/null'
+        runuser -l $user -c 'k3b >/dev/null 2>/dev/null'
      fi
   else
     return 1
   fi
 else
-  runuser -l $SUDO_USER -c 'k3b >/dev/null 2>/dev/null'
+  runuser -l $user -c 'k3b >/dev/null'
 fi
 }
 
+# Set custom commands. Set "customX_show" to '0' to disable or '1' to enable.
+# If enabled, the custom commands will be shown in the device sub-menu. The
+# description and command functions can be set to anything you desire. The
+# device name (e.g. /dev/sdb1) is passed as the first and only argument.
+# A maximum of 3 custom actions are configurable.
 #custom4_command() {
 #     
 #}
@@ -205,18 +262,45 @@ fi
 # post_unmount is run immediately after a successful unmount operation.
 
 
-# This example starts a script which audits the mountpoint and user home directory to catch file transfers and logs the media information.
+# This example starts a script which audits the mountpoint, user home directory, and directories specified in config file to watch file transfers and logs the media information.
+
+action_aft () {
+
+    file_date="$(date +%F-%H-%M-%S)"
+    mountpoint="$(findmnt -no TARGET "${1}")"
+    read -p "Enter the source file or directory: " source
+    mkdir -p "${aft_dir}"/"${SUDO_USER}"/"${file_date}" 2>/dev/null
+    cp -r "${source}" "${aft_dir}"/"${SUDO_USER}"/"${file_date}"
+    diff -rys --exclude=td.log "${aft_dir}"/"${SUDO_USER}"/"${file_date}" "${mountpoint}" >> "${aft_dir}"/"${SUDO_USER}"/"${file_date}"/td.log
+
+}
+
 
 post_mount () {
+
+ mountpoint="$(findmnt -no TARGET "${1}")"
+
   if [[ "${enable_logging}" == 'yes' ]]; then
      local -a watchdir=
      watchdir="${watch_directories}"
-     mountpoint="$(findmnt -no TARGET "${1}")"
-     user_home="$(echo "${USERNAME}" | cut -d = -f 2)"
-     msg "All data transfers are being audited to/from: "
-     msg "/home/${user_home}   ${mountpoint}   ${watchdir}"
-     nohup $mediawatch "${mountpoint}" "/home/${user_home}" "${watchdir}" "${logfile}" </dev/null >/dev/null 2>&1 &
-     echo "${date_fmt}:${SUDO_USER}:${witness}:mount successful" >> "${logfile}"
+     user_home="$(echo "${user}" | cut -d = -f 2)"
+     
+     if [[ "${find_writeable_directories}" == "yes" ]]; then   
+         nohup $mediawatch "${mountpoint}" "/home/${user_home}" "${watchdir}" $writeable_directories </dev/null >/dev/null 2>&1 &
+     else
+         echo "/home/${user_home}  ${mountpoint}  ${watchdir}"
+         nohup $mediawatch "${mountpoint}" "/home/${user_home}" "${watchdir}" </dev/null >/dev/null 2>&1 &
+     fi
+     sleep 2
+     inotify_pid="$(ps -ef | grep inotify.*"${mountpoint}" | awk -F ' ' '{ print $2 }')"
+     mediawatch_pid="$(ps -ef | grep mediawatch.*"${mountpoint}" | awk -F ' ' '{ print $2 }')"
+
+     device="$(lsblk -lno KNAME ${1})"
+     mkdir /var/tmp/bashmount-mediawatch/inotify_pid >/dev/null 2>/dev/null
+     mkdir /var/tmp/bashmount-mediawatch/mediawatch_pid >/dev/null  2>/dev/null
+     echo $inotify_pid > /var/tmp/bashmount-mediawatch/inotify_pid/$device
+     echo $mediawatch_pid > /var/tmp/bashmount-mediawatch/mediawatch_pid/$device
+     echo "${date_fmt}:${user}:${witness}:mount successful" >> "${logfile}"
      mount_info="$(lsblk -o NAME,FSTYPE,MOUNTPOINT,SIZE,LABEL,UUID "${1}")"
      echo "${mount_info}" >> "${logfile}" 
   fi
@@ -234,19 +318,29 @@ post_mount () {
 # This example will record the media information in the log file and kills then stops the media auditing.
 post_unmount() {
 if [[ "${enable_logging}" == 'yes' ]]; then  
-   echo "${date_fmt}:$SUDO_USER:unmount successful" >> "${logfile}"
+   echo "${date_fmt}:$user:unmount successful" >> "${logfile}"
    mount_info="$(lsblk -o NAME,FSTYPE,MOUNTPOINT,SIZE,LABEL,UUID "${1}")"
    echo "${mount_info}" >> "${logfile}" 
+   mountpoint="$(findmnt -no TARGET "${1}")"
+   device="$(lsblk -lno KNAME "${1}")"
+   while read -r line; do
+	kill -9 $line >/dev/null 2>/dev/null
+   done < /var/tmp/bashmount-mediawatch/inotify_pid/$device
+   #echo > /var/tmp/bashmount-mediawatch/inotify_pid/$device
+   while read -r line; do
+	kill -9 $line >/dev/null 2>/dev/null
+   done < /var/tmp/bashmount-mediawatch/mediawatch_pid/$device
+   #echo > /var/tmp/bashmount-mediawatch/mediawatch_pid/$device
 fi
 
 }
 
 
-#This example notifies the user of failed prechecks and then exits. It also loads the usb kernel module to allow usb devices if previously disabled in /etc/modprobe.d 
+# Notifies the user of failed prechecks and then exits. It also loads the usb kernel module to allow usb devices if previously disabled in /etc/modprobe.d 
 pre_init() {
 
 #=================================================
-if [[ "${automount_enable}" == 'yes' ]]; then
+if [[ "${automount}" == 'no' ]]; then
    autorun_check="$(gconftool-2 --direct --config-source xml:read:/etc/gconf/gconf.xml.mandatory --get /apps/nautilus/preferences/media_autorun_never)"
    if [[ "${autorun_check}" != true ]]; then
       error "gnome autorun should be disabled"
@@ -290,18 +384,22 @@ fi
    # Optional group check or just set sudo for executable to restrict. You can probably leave this commented out.
    #authorized_group=dta
    #check for automount disabled. kde?
-   #getent group $authorized_group | grep "$SUDO_USER"
+   #getent group $authorized_group | grep "$user"
    #if [ $? != 0 ];then
-      #echo "$SUDO_USER is not in the $authorized_group"
+      #echo "$user is not in the $authorized_group"
       #exit 1
    #fi
 #==================================================
-   # Warn or exit if script is run directly by root.
+  # Warn or exit if script is run directly by root.
   if [[ "${sudo_required}" == 'yes' ]]; then
-     if [[ "${SUDO_USER}" = '' ]]; then
-        error "$0 should be run with sudo"
+     # Sets "user" name 
+     user="${SUDO_USER}"
+     if [[ "${user}" = '' ]]; then
+        error "$0 is designed to only run with sudo, not directly by root"
         init=false
      fi
+  else
+     user="${USER}" 
   fi
 #=================================================
    #warn if k3b is not installed
@@ -309,6 +407,14 @@ fi
    if [[ $? != 0 ]]; then
       error "k3b is not installed. You will not be able to burn optical media" 
    fi
+#=================================================
+   #disable_tmp
+   #if [[ "${disable_tmp}" == "yes" ]]; then
+        #chmod o-w /tmp
+        #if [[ $? != 0 ]]; then
+            #init=false
+        #fi
+   #fi
 #==================================================
    #exit if any init checks are false
    if [[ "${init}" == "false" ]]; then
@@ -342,25 +448,14 @@ if [[ "${load_usb_module}" == 'yes' ]]; then
         echo "${date_fmt}:usb-storage.ko:failed to remove module" >> "${logfile}"
      fi
       error "Make sure to unmount device or contact System Administrator" 
-      #enter_to_continue
-      #return 1
       exit 1
   else
      if [[ "${enable_logging}" == 'yes' ]]; then
         echo "${date_fmt}:usb-storage.ko:module removed successfully" >> "${logfile}"
      fi
-     exit 1
+     exit 0
   fi
 fi
-
-#needs work! #commenting out for now. inotify processes will keep running #and logging until system is rebooted. Safest option until fixed.
-#if [[ "${enable_logging}" == 'yes' ]]; then
-   #mediawatch_process="$(pgrep mediawatch)"
-   #logk3b_process="$(pgrep logk3b)"
-   #kill $mediawatch_process >/dev/null 2>/dev/null
-   #kill $logk3b_process >/dev/null 2>/dev/null
-   #kill "$(pidof inotify)"
-#fi
 }
 
 

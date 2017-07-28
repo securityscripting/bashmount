@@ -1,0 +1,47 @@
+This Document explains the various NIST 800-53A and STIG requirements and how bashmount-au helps meet these requirements. Additional system configurations are often necessary to support compliance and are explained in this document. Bashmount-au was designed to help organizations and information systems security personnel meet NIST 800-53A and STIG requirements for Red Hat Linux 6 and 7. Other Linux OS, may need modification's to work and has not been tested. Refer to
+the bashmount-au.conf file to perform the various requirements as needed for your organization.
+
+NIST 800-53A Requirements:
+AC-3(1) ACCESS ENFORCEMENT | DUAL AUTHORIZATION
+Control: The orgnization enforce dual authorization for all transfer of data from a classified network to removable media.
+Bashmount-au: 
+- Configuration of sudoers file or equivalent role based access is necessary to restrict the execution of bashmount-au to a specific individual or group. 
+- Technically enforces a second unique individual with an active account to authenticate before an external device can be mounted.
+
+
+AC-4: INFORMATION FLOW ENFORCEMENT
+Control: The information system enforces approved authorizations for controlling the flow of information within the system and between interconnected systems.
+Data Transfer Tracking: All data transfers (e.g. low to high, high to low) must be tracked to include date, originator making request, filename, file format, classification level, source and destination systems, and approver.
+bashmount-au: 
+- Asks the user a series of questions to log this information before mounting an external device. 
+- Logs all file transfers to and from external media which includes the full filename of any transfered file. 
+- Stores an exact copy of all files modified on the external device.
+- Compares all files burned to optical media with the source files to verify that there is no extra information or hidden files burned.
+
+AC-5: SEPARATION OF DUTIES
+bashmount-au: 
+- Denies the program from executing if the user is logged in as 'root'.
+
+AC-6: LEAST PRIVILEGE
+Control: The organization employs the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) which are necessary to accomplish assigned tasks in accordance with organizational missions and business functions.
+bashmount-au:
+- Runs at an elevated privilege for authorized users only, but runs with normal user privilege when elevated privilege would overextend the users normal system privileges. (e.g. Runs the CD-Burning application k3b with the users privilege, so the user cannot access files they do not have normal system access to)
+
+AC-6(1) LEAST PRIVILEGE | AUTHORIZE ACCESS TO SECURITY FUNCTIONS
+Control: The orgnization explicitly authorizes access to systems and or software that provide security-related functions.
+All classified information systems must technically enforce restrictions on the ability to write to removable media. By default, all write functionality must be disabled. Whenever access to writable removable media is necessary, the write functionality may be enabled, bu this must be logged. After the write functions are completed, the write functionality must again be disabled and logged. Ensure media access is audited as indicated in AU-2.a
+bashmount-au:
+- As configured in sudoers file or equivalent only authorized personnel can run bashmount-au
+- By STIG requirement, the USB modules (driver) must be disabled by default. Bashmount-au automatically inserts (re-enables) the USB module upon execution, allowing write functionality. Upon exiting the application, bashmount-au again removes the USB module. This is also logged per the requirement.
+- Bashmount-au will not execute if other STIG requirements fail, such as automounting, which would bypass least privilege requirements.
+
+AU-2 AUDIT EVENTS 
+(g) Export/Writes/downloads to devices/digital media (e.g., CD/DVD, USB, SD) (Success/Failure)
+(h) Import/Uploads from devices/digital media (e.g., CD/DVD, USB, SD) (Success/Failure)
+bashmount-au:
+- Once a device is mounted, bashmount-au monitors the device for file and folder changes using the included mediawatch program which relies on inotify-tools software and inotify kernel subsystem. Bashmount-au can also monitor all folders the user has write access to, to monitor attempts and differentiate export or import of files from/to the device. This information is logged including information about the device, and also the user and witness usernames. 
+
+AU-3 CONTENT OF AUDIT RECORDS
+bashmount-au: 
+- Supports logging of imports/exports with required content. bashmount-au logs can be configured to a specific directory, and compared with other system logs to support all content of audit record requirements. 
+

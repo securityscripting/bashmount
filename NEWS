@@ -1,3 +1,16 @@
+bashmount-au 1.6 (2017-07-19)
+  Damian M.
+  - Added Network authentication function options
+  - Added install script
+  - Added COMPLIANCE information file
+
+bashmount-au 1.5 (2017-06-29)
+  Damian M.
+  - Enabled open functionality running as sudo user
+  - Fixed process detection and removal
+  - Added finding all user writable dir to add to watchlist
+  - Mediawatch sources config file directly instead of passing log file 
+
 bashmount-au 1.4 (2017-06-22)
   Damian M.
   - Organized and updated files and directories

@@ -11,7 +11,7 @@ Dependencies
 bashmount-au should work on all supported distributions with lsblk. Tested on RHEL6 & RHEL7.
 
 
-Installation
+Installation - run install.sh
 ============
 
 1. As root, copy "bashmount-au" to "/usr/bin" or any other location in $PATH:
@@ -29,9 +29,9 @@ Installation
 
 	install -m600 mediawatch.sh /usr/bin/mediawatch.sh
 
-5 As root, copy "bashmount-au.functions" to /usr/share/bashmount-au.functions
+5. As root, copy "bashmount-au.functions" to /usr/share/bashmount-au/bashmount-au.functions
 
-	install -m600 bashmount-au.functions /usr/share/bashmount-au.functions
+	install -m600 bashmount-au.functions /usr/share/bashmount-au/bashmount-au.functions
 
 6. Optionally, copy "bashmount-au.conf" to "$HOME/.config/bashmount-au/config"
    for per-user configuration:
@@ -44,7 +44,7 @@ Installation
         gzip -9 bashmount-au.1
         install -m644 bashmount-au.1.gz /usr/share/man/man1/bashmount-au.1.gz
 
-7. Make life a bit easier by setting an alias in "$HOME/.bashrc":
+8. Make life a bit easier by setting an alias to the mount command in "$HOME/.bashrc" or /etc/bashrc:
 
         alias mount='bashmount-au'
 
@@ -54,13 +54,14 @@ Configuration
 
 1. Disable autofs and gnome-automount & auto_run according to your distributions directions.
 
-2. Create a group for data transfer personnel and assign designated personnel (ie. dta)
+2. Create a group for data transfer personnel and assign designated personnel to group (ie. dta). 
 
-3. Configure /etc/sudoers file and assign group to run bashmount-au. (ie. %dta ALL=(ALL) /usr/bin/bashmount-au)
+3. Configure /etc/sudoers or domain role and allow group to run bashmount-au with elevated privileges. (ie. %dta ALL=(ALL) /usr/bin/bashmount-au)
+  NOTE: Permissions and ownership for mount executable and k3b should only allow root or data transfer group.
 
-4. Configure /etc/bashmount-au.conf for desired checks and logfile (must create this file). Default is all strict checks. See config file for explanation and variable settings including optional second authentication.
+4. Configure /etc/bashmount-au.conf for desired checks and logfile and create files if necessary. Default is all strict checks. See config file for explanation and variable settings including optional second authentication.
 
-5. Verify or change existing mount command to restrict to root. Remove all mounting of external devices in /etc/fstab.
+5. Verify or change existing mount command and k3b binary to restrict to root or data transfer group. Remove all mounting of external devices in /etc/fstab.
 
 6. Install inotify-tools from EPEL repository.
 

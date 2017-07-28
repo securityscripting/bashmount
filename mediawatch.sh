@@ -1,31 +1,38 @@
 #!/bin/bash
-#local -a watchdir_selectable=
+. /etc/bashmount-au.conf
 
-watchdir_const1="${1}"
-watchdir_const2="${2}"
-watchdir_selectable="${3}"
-logfile="${4}"
+inotifywait -m -r "$@" | while read path action file; do 
 
-rpm -qa | grep inotify-tools >> /dev/null
-if [[ $? != 0 ]];then
-  echo "inotify executable cannot be found. Install inotify-tools..exiting"
-  exit 1
-fi 
+#file_owner="$(stat -L --format='%U' $path$file)"
+#if [[ "$file_owner" != "${SUDO_USER}"* ]]; then
+#   action=''
+#fi
+     
+#temp fixes for system writing files and removing files multiple times per sec
+  if [[ "$path$file" == "/tmp/vte"* ]]; then
+      action=''
+  fi
 
-inotifywait -m -r "${watchdir_const1}" "${watchdir_const2}" $watchdir_selectable | while read path action file; do 
+  if [[ "$path$file" == "/var/centrifydc/user/" ]]; then
+      if [[ "$action" == "ATTRIB,ISDIR" ]]; then
+         action=''
+      fi
+  fi
 
-#sets timestamp
-date_fmt="$(date +%D-%H-%M-%S)"
+
+  #sets timestamp
+  date_fmt="$(date +%D-%H-%M-%S)"
 
 send_to_log () {
-1="${path}"
-2="${file}"
-3="${action}"
-     
-  echo "${date_fmt}":"${path}""${file}":"${action}" >> "${logfile}"
+
+   echo "${date_fmt}":"${path}""${file}":"${action}" >> "${logfile}"
+
 }
 
+run_action () {
+
     case $action in
+
          MOVED_FROM)
           action="moved from ${path}"; send_to_log "${path}" "${file}" "${action}";;
 	 MOVED_TO)
@@ -35,7 +42,10 @@ send_to_log () {
          ACCESS)
 	  action="file read"; send_to_log "${path}" "${file}" "${action}";;
          MODIFY)
-          action="file written"; send_to_log "${path}" "${file}" "${action}";;
+          if [[ "$save_copy" == "yes" ]]; then
+             cp $path$file $save_copy_directory/$SUDO_USER/"$(date +%F)"
+          fi
+             action="file written"; send_to_log "${path}" "${file}" "${action}";;
          ATTRIB)
           action="file attributes modified"; send_to_log "${path}" "${file}" "${action}";;
          ATTRIB,ISDIR)
@@ -43,28 +53,51 @@ send_to_log () {
 	 OPEN)
           action="file opened"; send_to_log "${path}" "${file}" "${action}";;
          CREATE)
-          action="file created"; send_to_log "${path}" "${file}" "${action}";;
+          if [[ "$save_copy" == "yes" ]]; then
+             cp $path$file $save_copy_directory/$SUDO_USER/"$(date +%F)"
+          fi
+             action="file created"; send_to_log "${path}" "${file}" "${action}";;
 	 DELETE)
-          action="file deleted"; send_to_log "${path}" "${file}" "${action}";;
+            action="file deleted"; send_to_log "${path}" "${file}" "${action}";;
          CLOSE_WRITE,CLOSE)
 	  action="file closed after opened in write mode"; send_to_log "${path}" "${file}" "${action}";;
          CLOSE_NOWRITE,CLOSE)
           action="file closed after opened in read-only mode"; send_to_log "${path}" "${file}" "${action}";;
 	 CREATE,ISDIR)
+           if [[ "$save_copy" == "yes" ]]; then
+              cp $path$file $save_copy_directory/$SUDO_USER/"$(date +%F)"
+           fi
 	  action="directory created"; send_to_log "${path}" "${file}" "${action}";;
          DELETE,ISDIR)
           action="directory deleted"; send_to_log "${path}" "${file}" "${action}";;
 	 UNMOUNT)
           action="directory unmounted"; send_to_log "${path}" "${file}" "${action}";; 
-         # Probably want to listings actions. Uncommment if desired.
+         # Probably don't want any "listings" actions. Uncommment if desired.
          #CLOSE_NOWRITE,CLOSE,ISDIR)
 	  #action="listing directory"; send_to_log "${path}" "${file}" "${action}";;;
          #OPEN,ISDIR)
 	  #action="listing directory"; send_to_log "${path}" "${file}" "${action}";;
          #*)
 	  #action=$action; send_to_log "${path}" "${file}" "${action}";;
+   
    esac
- 
+}
+
+  if [[ "$save_copy" == "yes" ]]; then
+    if [[ "$log_mountpoint_only" == "yes" ]]; then
+     mkdir -p $save_copy_directory/$SUDO_USER/"$(date +%F)"
+    fi
+  fi
+
+  if [[ "$log_mountpoint_only" == "yes" ]]; then
+     if [[ "$path" == "${1}/" ]]; then
+        run_action
+     fi
+  else
+        run_action
+  fi
+
+
 done &
 
 exit 0
